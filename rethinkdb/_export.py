@@ -33,6 +33,7 @@ import sys
 import tempfile
 import time
 import traceback
+import zlib
 from multiprocessing.queues import SimpleQueue
 
 import six
@@ -193,9 +194,10 @@ def parse_options(argv, prog=None):
 def json_writer(filename, fields, task_queue, error_queue, format):
     try:
         with open(filename, "w") as out:
+            compress = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION, zlib.DEFLATED, 15)
             first = True
             if format != "ndjson":
-                out.write("[")
+                out.write(compress.compress("["))
             item = task_queue.get()
             while not isinstance(item, StopIteration):
                 row = item[0]
@@ -205,18 +207,23 @@ def json_writer(filename, fields, task_queue, error_queue, format):
                             del row[item]
                 if first:
                     if format == "ndjson":
-                        out.write(json.dumps(row))
+                        delimiter = ""
                     else:
-                        out.write("\n" + json.dumps(row))
+                        delimiter = "\n"
                     first = False
                 elif format == "ndjson":
-                    out.write("\n" + json.dumps(row))
+                    delimiter = "\n"
                 else:
-                    out.write(",\n" + json.dumps(row))
+                    delimiter = ",\n"
+
+                rowjson = compress.compress(delimiter + json.dumps(row))
+                out.write(rowjson)
 
                 item = task_queue.get()
             if format != "ndjson":
-                out.write("\n]\n")
+                out.write(compress.compress("\n]\n"))
+
+            out.write(compress.flush())
     except BaseException:
         ex_type, ex_class, tb = sys.exc_info()
         error_queue.put((ex_type, ex_class, traceback.extract_tb(tb)))

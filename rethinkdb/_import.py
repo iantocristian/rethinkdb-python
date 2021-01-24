@@ -33,6 +33,7 @@ import signal
 import sys
 import time
 import traceback
+import zlib
 from multiprocessing.queues import Queue, SimpleQueue
 
 import six
@@ -488,6 +489,27 @@ class NeedMoreData(Exception):
     pass
 
 
+def decompress(source):
+
+    print("decompressing", source)
+
+    decompress = zlib.decompressobj()
+    srcfile = open(source, 'rb')
+
+    root, ext = os.path.splitext(source)
+    dest = root + "~.json"
+    destfile = open(dest, "wb")
+
+    data = srcfile.read(10240)
+    while data:
+        destfile.write(decompress.decompress(data))
+        data = srcfile.read(10240)
+
+    destfile.write(decompress.flush())
+
+    return dest
+
+
 class JsonSourceFile(SourceFile):
     format = "json"
 
@@ -499,6 +521,13 @@ class JsonSourceFile(SourceFile):
     _buffer_str = None
     _buffer_pos = None
     _buffer_end = None
+
+    def __init__(self, *args, **kwargs):
+
+        source = kwargs["source"]
+        kwargs["source"] = decompress(source)
+
+        super(JsonSourceFile, self).__init__(*args, **kwargs)
 
     def fill_buffer(self):
         if self._buffer_str is None:

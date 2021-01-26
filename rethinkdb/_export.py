@@ -193,11 +193,11 @@ def parse_options(argv, prog=None):
 
 def json_writer(filename, fields, task_queue, error_queue, format):
     try:
-        with open(filename, "w") as out:
+        with open(filename, "wb") as out:
             compress = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION, zlib.DEFLATED, 15)
             first = True
             if format != "ndjson":
-                out.write(compress.compress("["))
+                out.write(compress.compress("[".encode()))
             item = task_queue.get()
             while not isinstance(item, StopIteration):
                 row = item[0]
@@ -216,12 +216,12 @@ def json_writer(filename, fields, task_queue, error_queue, format):
                 else:
                     delimiter = ",\n"
 
-                rowjson = compress.compress(delimiter + json.dumps(row))
+                rowjson = compress.compress((delimiter + json.dumps(row)).encode())
                 out.write(rowjson)
 
                 item = task_queue.get()
             if format != "ndjson":
-                out.write(compress.compress("\n]\n"))
+                out.write(compress.compress("\n]\n".encode()))
 
             out.write(compress.flush())
     except BaseException:

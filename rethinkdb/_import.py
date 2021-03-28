@@ -387,22 +387,13 @@ class SourceFile(object):
                     )
                 )
 
-    def batches(self, batch_size=None, warning_queue=None):
+    def batches(self, batch_size, warning_queue):
 
         # setup table
         self.setup_table()
 
-        # default batch_size
-        if batch_size is None:
-            batch_size = utils_common.default_batch_size
-        else:
-            batch_size = int(batch_size)
-
-        if batch_size <= 0:
-            raise AssertionError("Batch size can not be less than one")
-
         # setup
-        self.setup_file(warning_queue=warning_queue)
+        self.setup_file(warning_queue)
 
         # - yield batches
 
@@ -439,7 +430,7 @@ class SourceFile(object):
             if self.indexes:
                 self.restore_indexes(warning_queue)
 
-    def setup_file(self, warning_queue=None):
+    def setup_file(self, warning_queue):
         raise NotImplementedError("Subclasses need to implement this")
 
     def teardown(self):
@@ -452,22 +443,19 @@ class SourceFile(object):
         error_queue,
         warning_queue,
         timing_queue,
-        fields=None,
-        ignore_signals=True,
-        batch_size=None,
+        fields,
+        batch_size,
+        ignore_signals=True
     ):
         if (
             ignore_signals
         ):  # ToDo: work out when we are in a worker process automatically
             signal.signal(signal.SIGINT, signal.SIG_IGN)  # workers should ignore these
 
-        if batch_size is None:
-            batch_size = utils_common.default_batch_size
-
         self.start_time = time.time()
         try:
             timePoint = time.time()
-            for batch in self.batches(warning_queue=warning_queue):
+            for batch in self.batches(batch_size, warning_queue):
                 timing_queue.put(("reader_work", time.time() - timePoint))
                 timePoint = time.time()
 
@@ -587,7 +575,7 @@ class JsonSourceFile(SourceFile):
         except (ValueError, IndexError):
             raise NeedMoreData()
 
-    def setup_file(self, warning_queue=None):
+    def setup_file(self, warning_queue):
         # - move to the first record
 
         # advance through any leading whitespace
@@ -704,7 +692,7 @@ class CsvSourceFile(SourceFile):
             else:
                 yield line
 
-    def setup_file(self, warning_queue=None):
+    def setup_file(self, warning_queue):
         # - setup csv.reader with a byte counter wrapper
 
         self._reader = csv.reader(self.byte_counter())
